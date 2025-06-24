@@ -53,8 +53,8 @@ public class TypecastTTS : MonoBehaviour
 
         string jsonText = request.downloadHandler.text;
         JObject responseJson = JObject.Parse(jsonText);
-        string speakUrl = responseJson["result"]?["speak_url"]?.ToString();
-
+        string speakUrl = responseJson["result"]?["speak_v2_url"]?.ToString();
+        
         if (string.IsNullOrEmpty(speakUrl))
         {
             Debug.LogError("speak_url 없음: " + jsonText);
@@ -93,7 +93,8 @@ public class TypecastTTS : MonoBehaviour
             await Task.Delay(delayMs);
         }
 
-        string audioUrl = responseAudioJson?["result"]?["audio"]?["url"]?.ToString();
+        Debug.Log(responseAudioJson);
+        string audioUrl = responseAudioJson?["result"]?["audio_download_url"]?.ToString();
         if (string.IsNullOrEmpty(audioUrl))
         {
             Debug.LogError("오디오 다운로드 URL 없음");
@@ -102,8 +103,10 @@ public class TypecastTTS : MonoBehaviour
         
         Debug.Log("오디오 다운로드 URL: " + audioUrl);
 
-        var audioDownloadRequest = UnityWebRequestMultimedia.GetAudioClip(audioUrl, AudioType.WAV);
+        UnityWebRequest audioDownloadRequest = new UnityWebRequest(audioUrl, UnityWebRequest.kHttpVerbGET);
+        audioDownloadRequest.downloadHandler = new DownloadHandlerAudioClip(audioUrl, AudioType.WAV);
         audioDownloadRequest.SetRequestHeader("Authorization", $"Bearer {_apiKey}");
+        
         await audioDownloadRequest.SendWebRequest();
 
         if (audioDownloadRequest.result != UnityWebRequest.Result.Success)
