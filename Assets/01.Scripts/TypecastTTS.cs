@@ -25,7 +25,7 @@ public class TypecastTTS : MonoBehaviour
         await RequestAndPlayAudio(text);
     }
 
-    private async Task RequestAndPlayAudio(string text)
+    private async Task<string> SendURLRequest(string text)
     {
         JObject payload = new JObject
         {
@@ -44,24 +44,23 @@ public class TypecastTTS : MonoBehaviour
         request.SetRequestHeader("Authorization", $"Bearer {_apiKey}");
 
         await request.SendWebRequest();
-
+        
         if (request.result != UnityWebRequest.Result.Success)
         {
             Debug.LogError("TTS 요청 실패: " + request.error);
-            return;
-        }
-
+            return null;
+        } 
+        
         string jsonText = request.downloadHandler.text;
         JObject responseJson = JObject.Parse(jsonText);
+        
         string speakUrl = responseJson["result"]?["speak_v2_url"]?.ToString();
         
-        if (string.IsNullOrEmpty(speakUrl))
-        {
-            Debug.LogError("speak_url 없음: " + jsonText);
-            return;
-        }
+        return speakUrl;
+    }
 
-        // Polling 요청
+    private async Task<string> SendPollingRequest(string speakUrl)
+    {
         JObject responseAudioJson = null;
         const int maxRetries = 20;
         const int delayMs = 500;
@@ -76,10 +75,11 @@ public class TypecastTTS : MonoBehaviour
             if (audioRequest.result != UnityWebRequest.Result.Success)
             {
                 Debug.LogError("오디오 상태 확인 실패: " + audioRequest.error);
-                return;
+                return null;
             }
-
+            
             string jsonAudioText = audioRequest.downloadHandler.text;
+            
             responseAudioJson = JObject.Parse(jsonAudioText);
             string status = responseAudioJson["result"]?["status"]?.ToString();
 
@@ -94,34 +94,52 @@ public class TypecastTTS : MonoBehaviour
         }
 
         string audioUrl = responseAudioJson?["result"]?["audio_download_url"]?.ToString();
-        if (string.IsNullOrEmpty(audioUrl))
-        {
-            Debug.LogError("오디오 다운로드 URL 없음");
-            return;
-        }
-        
-        Debug.Log("오디오 다운로드 URL: " + audioUrl);
 
+        
+        return audioUrl;
+    }
+
+    private async Task<AudioClip> DownloadAudioClip(string audioUrl)
+    {
         UnityWebRequest audioDownloadRequest = new UnityWebRequest(audioUrl, UnityWebRequest.kHttpVerbGET);
         audioDownloadRequest.downloadHandler = new DownloadHandlerAudioClip(audioUrl, AudioType.WAV);
-        audioDownloadRequest.SetRequestHeader("Authorization", $"Bearer {_apiKey}");
         
         await audioDownloadRequest.SendWebRequest();
 
         if (audioDownloadRequest.result != UnityWebRequest.Result.Success)
         {
             Debug.LogError("오디오 다운로드 실패: " + audioDownloadRequest.error);
-            return;
+            return null;
         }
 
         AudioClip clip = DownloadHandlerAudioClip.GetContent(audioDownloadRequest);
-        if (clip == null)
+
+        return clip;
+    }
+
+    private async Task RequestAndPlayAudio(string text)
+    {
+        string speakUrl = await SendURLRequest(text);
+        if (string.IsNullOrEmpty(speakUrl))
         {
-            Debug.LogError("AudioClip 변환 실패");
+            Debug.LogError("speak_url 없음");
             return;
         }
 
-        _audioSource.clip = clip;
+        string audioUrl = await SendPollingRequest(speakUrl);
+        if (string.IsNullOrEmpty(audioUrl))
+        {
+            Debug.LogError("오디오 다운로드 URL 없음");
+            return;
+        }
+        
+        _audioSource.clip = await DownloadAudioClip(audioUrl);
+        if (_audioSource.clip == null)
+        {
+            Debug.LogError("오디오 클립 다운로드 실패");
+            return;
+        }
+        
         _audioSource.Play();
     }
 }
