@@ -12,7 +12,10 @@ using UnityEngine.UI;
 
 public class ChatGPTTest : MonoBehaviour
 {
-    public TextMeshProUGUI ResultTextField;
+    [SerializeField] private Chat _NpcChatPrefab;
+    [SerializeField] private Chat _PlayerChatPrefab;
+    [SerializeField] private Transform _contentPanel;
+    
     public TMP_InputField PromptField;
     public AudioSource MyAudioSource;
     public RawImage BackgroundImage;
@@ -52,7 +55,10 @@ public class ChatGPTTest : MonoBehaviour
         Message userMessage = new Message(Role.User, prompt);
         _chatHistory.Add(userMessage); // 사용자 메시지 추가
         
-        ResultTextField.text = $"{ResultTextField.text}{prompt}";
+        // 플레이어 메시지 UI 생성
+        Chat playerChat = Instantiate(_PlayerChatPrefab, transform);
+        playerChat.DisplayMessage(prompt);
+        playerChat.transform.SetParent(_contentPanel);
         
         // var chatRequest = new ChatRequest(_chatHistory, Model.GPT4oAudioMini, audioConfig:Voice.Alloy); // 메시지 전송
         var chatRequest = new ChatRequest(_chatHistory, Model.GPT4o); // 메시지 전송
@@ -63,7 +69,10 @@ public class ChatGPTTest : MonoBehaviour
         var choice = response.FirstChoice; // 첫 번째 선택지 가져오기
         _chatHistory.Add(choice.Message); // 응답 메시지 추가
 
-        ResultTextField.text = $"{ResultTextField.text}\n\n{npcResponse.ReplyMessage}\n\n";
+        // NPC 메시지 UI 생성
+        Chat npcChat = Instantiate(_NpcChatPrefab, transform);
+        npcChat.DisplayMessage(npcResponse.ReplyMessage);
+        npcChat.transform.SetParent(_contentPanel);
         
         PromptField.text = string.Empty; // 입력 필드 비우기
         

@@ -64,7 +64,7 @@ public class TypecastTTS : MonoBehaviour
         // Polling 요청
         JObject responseAudioJson = null;
         const int maxRetries = 20;
-        const int delayMs = 1000;
+        const int delayMs = 500;
         for (int i = 0; i < maxRetries; i++)
         {
             UnityWebRequest audioRequest = UnityWebRequest.Get(speakUrl);
@@ -93,7 +93,6 @@ public class TypecastTTS : MonoBehaviour
             await Task.Delay(delayMs);
         }
 
-        Debug.Log(responseAudioJson);
         string audioUrl = responseAudioJson?["result"]?["audio_download_url"]?.ToString();
         if (string.IsNullOrEmpty(audioUrl))
         {
